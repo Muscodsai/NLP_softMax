@@ -3,14 +3,21 @@ import pandas as pd
 from typing import Literal
 from dotenv import load_dotenv
 import os
-
 import dspy
 
+# Import data from dataset (will be needed later for few shot prompting examples)
 train, test = load_dataset()
-classes = ['project_development', 'coursework', 'discussion_forums', 'university_admin', 'opportunities_events']
+
+# Initialise variables & select model API to use
 load_dotenv()
 decoder_api_key = os.getenv("DECODER_API_KEY")
+decoder_model = dspy.LM('huggingface/allenai/Olmo-3-7B-Instruct', api_key=decoder_api_key)
+dspy.configure(lm=decoder_model)
 
+classes = ['project_development', 'coursework', 'discussion_forums', 'university_admin', 'opportunities_events']
+
+
+# Signature class for DSPY email classification
 class ClassifyEmail(dspy.Signature):
     """Select the most likely category that this email is in."""
 
@@ -18,11 +25,70 @@ class ClassifyEmail(dspy.Signature):
     body: str = dspy.InputField()
     label: Literal['project_development', 'coursework', 'discussion_forums', 'university_admin', 'opportunities_events'] = dspy.OutputField()
 
-decoder_model = dspy.LM('huggingface/allenai/Olmo-3-7B-Instruct', api_key=decoder_api_key)
-dspy.configure(lm=decoder_model)
 
+# Create functions which predict the email type using various prompting methods
 classify_email_0shot = dspy.Predict(ClassifyEmail)
 classify_email_CoT = dspy.ChainOfThought(ClassifyEmail)
+
+
+def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
+    """
+    Predicts the label using a pre-trained decoder model with prompt engineering
+
+    Parameters
+        data: feature matrix of data to predict
+        mode: the prompting method to use (eg. 0_shot, few_shot, chain_of_thought)
+
+    Returns
+        label: predicted label
+        prompt: the optimised prompt which DSPY created and sent to the model
+        reasoning (for chain_of_thought): the model's reasoning behind selecting the label
+    """
+    match mode:
+        case "0_shot":
+            # Zero shot prompting. Simply give the model an email and ask it to
+            # classify it.
+            response = classify_email_0shot(subject=data["subject"][0], body=data["body"][0])
+            label = response.label
+            extra_info = pd.DataFrame(
+                {
+                    "prompt": [dspy.settings.lm.history[-1]["messages"]],
+                }
+            )
+        case "few_shot":
+            # Few shot prompting. Provide the model with a few examples of
+            # correctly classified emails before asking it to classify the
+            # input email
+            # TODO. Will need to use DSPY optimisers. Also maybe combine few
+            # shot with CoT in another case?
+            pass
+        case "chain_of_thought":
+            # Chain of thought prompting. Get the model to work through its
+            # reasoning step by step before predicting the email type,
+            # potentially improving results
+            response = classify_email_CoT(subject=data["subject"][0], body=data["body"][0])
+            label = response.label
+            extra_info = pd.DataFrame(
+                {
+                    "prompt": [dspy.settings.lm.history[-1]["messages"]],
+                    "reasoning": [response.reasoning],
+                }
+            )
+        case _:
+            # The mode passed to the function is invalid
+            label = "Error: Mode must be either 0_shot, few_shot, or chain_of_thought"
+            extra_info = pd.DataFrame(
+                {
+                    "error": ["Error"],
+                }
+            )
+
+    return label, extra_info
+
+
+# ---------------------------------------------------------------------------
+# TESTING
+# ---------------------------------------------------------------------------
 
 test_subj = "COMP9417-COMP[PHONE]_00122: Week 6 updates"
 test_body="""COMP9417-COMP[PHONE]_00122
@@ -48,41 +114,12 @@ Change your forum digest preferences"""
 
 input = create_predict_dataset(test_subj, test_body)
 
-def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
-    match mode:
-        case "0_shot":
-            response = classify_email_0shot(subject=data["subject"][0], body=data["body"][0])
-            label = response.label
-            extra_info = pd.DataFrame(
-                {
-                    "none": ["No extra info"],
-                }
-            )
-        case "few_shot":
-            # TODO. Will need to use DSPY optimisers.
-            pass
-        case "chain_of_thought":
-            response = classify_email_CoT(subject=data["subject"][0], body=data["body"][0])
-            label = response.label
-            extra_info = pd.DataFrame(
-                {
-                    "reasoning": [response.reasoning],
-                }
-            )
-        case _:
-            label = "Error: Mode must be either 0_shot, few_shot, or chain_of_thought"
-            extra_info = pd.DataFrame(
-                {
-                    "none": ["No extra info"],
-                }
-            )
+print("0 SHOT:")
+label, ext = predict_label(input, "0_shot")
+print(f"Label: {label}")
+print()
 
-    return label, extra_info
-
-
-# label, ext = predict_label(input, "0_shot")
-# print(label)
-# print(ext)
-# label, ext = predict_label(input, "chain_of_thought")
-# print(label)
-# print(ext)
+print("CHAIN OF THOUGHT:")
+label, ext = predict_label(input, "chain_of_thought")
+print(f"Label: {label}")
+print(f"Reasoning: {ext["reasoning"][0]}")
