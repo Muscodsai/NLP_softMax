@@ -49,9 +49,24 @@ few_shot_optimiser = dspy.BootstrapFewShot(accuracy_metric)
 
 # Create functions which predict the email type using various prompting methods
 classify_email_0shot = dspy.Predict(ClassifyEmail)
+classify_email_0shot.save("models/decoder_0_shot.json")
+
 classify_email_CoT = dspy.ChainOfThought(ClassifyEmail)
-classify_email_few_shot = few_shot_optimiser.compile(classify_email_0shot, trainset=few_shot_examples)
-classify_email_few_shot_CoT = few_shot_optimiser.compile(classify_email_CoT, trainset=few_shot_examples)
+classify_email_CoT.save("models/decoder_CoT.json")
+
+if os.path.isfile("models/decoder_few_shot.json"):
+    classify_email_few_shot = dspy.Predict(ClassifyEmail)
+    classify_email_few_shot.load("models/decoder_few_shot.json")
+else:
+    classify_email_few_shot = few_shot_optimiser.compile(classify_email_0shot, trainset=few_shot_examples)
+    classify_email_few_shot.save("models/decoder_few_shot.json")
+
+if os.path.isfile("models/decoder_few_shot_CoT.json"):
+    classify_email_few_shot_CoT = dspy.ChainOfThought(ClassifyEmail)
+    classify_email_few_shot_CoT.load("models/decoder_few_shot_CoT.json")
+else:
+    classify_email_few_shot_CoT = few_shot_optimiser.compile(classify_email_CoT, trainset=few_shot_examples)
+    classify_email_few_shot_CoT.save("models/decoder_few_shot_CoT.json")
 
 
 def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
@@ -89,8 +104,6 @@ def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
                     "prompt": [dspy.settings.lm.history[-1]["messages"]],
                 }
             )
-
-            print(response)
         case "chain_of_thought":
             # Chain of thought prompting. Get the model to work through its
             # reasoning step by step before predicting the email type,
@@ -115,8 +128,6 @@ def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
                     "reasoning": [response.reasoning],
                 }
             )
-
-            print(response)
         case _:
             # The mode passed to the function is invalid
             label = "Error: Mode must be either 0_shot, few_shot, chain_of_thought, or few_shot_CoT"
