@@ -191,6 +191,9 @@ for i, row in enumerate(test.itertuples()):
         # Timeout to prevent API from being overloaded
         time.sleep(0.1)
 
+    if i > 3:
+        break
+
 # Calculate metrics for each of the 4 prompting modes
 accuracies = []
 precisions = []
@@ -225,6 +228,7 @@ for i in range(len(modes)):
     confusion_plot = ConfusionMatrixDisplay(confusion, display_labels=classes)
     fig, ax = plt.subplots(figsize=(max(6, len(classes)), max(5, len(classes) - 1)))
     confusion_plot.plot(ax=ax, colorbar=True, cmap="Blues")
-    ax.set_title(f"Confusion Matrix: OLMo with {modes[i]} prompting", fontsize=13, pad=12)
+    ax.set_title(f"Confusion Matrix: OLMo with\n{modes[i]} prompting", fontsize=13, pad=12)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
     plt.tight_layout()
     plt.savefig(f"metrics/olmo_{modes[i]}_confusion_matrix.png", dpi=150)
