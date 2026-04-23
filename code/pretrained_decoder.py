@@ -13,10 +13,11 @@ train, test = load_dataset()
 
 # Initialise constants and variables, and select model API to use
 MAX_TRAINING_EXAMPLES = 50
+model_name = 'huggingface/allenai/Olmo-3-7B-Instruct'
 
 load_dotenv()
 decoder_api_key = os.getenv("DECODER_API_KEY")
-decoder_model = dspy.LM('huggingface/allenai/Olmo-3-7B-Instruct', api_key=decoder_api_key)
+decoder_model = dspy.LM(model_name, api_key=decoder_api_key)
 dspy.configure(lm=decoder_model)
 
 classes = ['project_development', 'coursework', 'discussion_forums', 'university_admin', 'opportunities_events']
