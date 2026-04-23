@@ -158,8 +158,15 @@ pred_few_shot_CoT = []
 
 prediction_index = [pred_0_shot, pred_few_shot, pred_CoT, pred_few_shot_CoT]
 
+num_test_cases = test.shape[0]
+
+print("Starting tests...")
+print(f"Number of test examples: {num_test_cases}")
+
 # Test every email in our test set with each of the 4 prompting modes
-for row in test.itertuples():
+for i, row in enumerate(test.itertuples()):
+    print(f"Testing example {i} of {num_test_cases}...")
+
     input = create_predict_dataset(row.subject, row.body)
     actual_labels.append(row.label)
     pred_0_shot.append(predict_label(input, "0_shot")[0])
@@ -172,6 +179,8 @@ accuracies = []
 precisions = []
 recalls = []
 f1s = []
+
+print("Computing metrics...")
 
 for i in range(len(modes)):
     accuracies.append(accuracy_score(actual_labels, prediction_index[i]))
