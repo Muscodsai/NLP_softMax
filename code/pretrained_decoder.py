@@ -149,86 +149,88 @@ def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
 # - Note: Do not run these tests too often, the API we're using has a limited
 #         number of requests per month
 # ---------------------------------------------------------------------------
+def run_testing():
+    modes = ["0_shot", "few_shot", "chain_of_thought", "few_shot_CoT"]
 
-modes = ["0_shot", "few_shot", "chain_of_thought", "few_shot_CoT"]
+    actual_labels = []
+    pred_0_shot = []
+    pred_few_shot = []
+    pred_CoT = []
+    pred_few_shot_CoT = []
 
-actual_labels = []
-pred_0_shot = []
-pred_few_shot = []
-pred_CoT = []
-pred_few_shot_CoT = []
+    prediction_index = [pred_0_shot, pred_few_shot, pred_CoT, pred_few_shot_CoT]
 
-prediction_index = [pred_0_shot, pred_few_shot, pred_CoT, pred_few_shot_CoT]
+    num_test_cases = test.shape[0]
 
-num_test_cases = test.shape[0]
+    print("Starting tests...")
+    print(f"Number of test examples: {num_test_cases}")
 
-print("Starting tests...")
-print(f"Number of test examples: {num_test_cases}")
+    # Test every email in our test set with each of the 4 prompting modes
+    for i, row in enumerate(test.itertuples()):
+        print(f"Testing example {i} of {num_test_cases}...")
 
-# Test every email in our test set with each of the 4 prompting modes
-for i, row in enumerate(test.itertuples()):
-    print(f"Testing example {i} of {num_test_cases}...")
+        skip = False
+        body_words = row.body.split()
 
-    skip = False
-    body_words = row.body.split()
+        # Check if the test example is suitable (OLMo does not like certain inputs
+        # if the token is too long)
+        for word in body_words:
+            if len(word) > 100:
+                print(f"Skipping example {i} of {num_test_cases}: Contains a token which is too long")
+                skip = True
+                break
 
-    # Check if the test example is suitable (OLMo does not like certain inputs
-    # if the token is too long)
-    for word in body_words:
-        if len(word) > 100:
-            print(f"Skipping example {i} of {num_test_cases}: Contains a token which is too long")
-            skip = True
-            break
+        if not skip:
+            input = create_predict_dataset(row.subject, row.body)
+            actual_labels.append(row.label)
+            pred_0_shot.append(predict_label(input, "0_shot")[0])
+            pred_few_shot.append(predict_label(input, "few_shot")[0])
+            pred_CoT.append(predict_label(input, "chain_of_thought")[0])
+            pred_few_shot_CoT.append(predict_label(input, "few_shot_CoT")[0])
 
-    if not skip:
-        input = create_predict_dataset(row.subject, row.body)
-        actual_labels.append(row.label)
-        pred_0_shot.append(predict_label(input, "0_shot")[0])
-        pred_few_shot.append(predict_label(input, "few_shot")[0])
-        pred_CoT.append(predict_label(input, "chain_of_thought")[0])
-        pred_few_shot_CoT.append(predict_label(input, "few_shot_CoT")[0])
+            # Timeout to prevent API from being overloaded
+            time.sleep(0.1)
 
-        # Timeout to prevent API from being overloaded
-        time.sleep(0.1)
+    # Calculate metrics for each of the 4 prompting modes
+    accuracies = []
+    precisions = []
+    recalls = []
+    f1s = []
 
-    if i > 3:
-        break
+    print("Computing metrics...")
 
-# Calculate metrics for each of the 4 prompting modes
-accuracies = []
-precisions = []
-recalls = []
-f1s = []
+    for i in range(len(modes)):
+        accuracies.append(accuracy_score(actual_labels, prediction_index[i]))
+        precisions.append(precision_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
+        recalls.append(recall_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
+        f1s.append(f1_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
 
-print("Computing metrics...")
+    # Print and save metrics, and save confusion matrices
+    metric_template = """OLMO test metrics for the {} prompting method:
+    Accuracy: {}
+    Precision: {}
+    Recall: {}
+    F1 Score: {}"""
 
-for i in range(len(modes)):
-    accuracies.append(accuracy_score(actual_labels, prediction_index[i]))
-    precisions.append(precision_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
-    recalls.append(recall_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
-    f1s.append(f1_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
+    for i in range(len(modes)):
+        metric_string = metric_template.format(modes[i], accuracies[i], precisions[i], recalls[i], f1s[i])
 
-# Print and save metrics, and save confusion matrices
-metric_template = """OLMO test metrics for the {} prompting method:
-Accuracy: {}
-Precision: {}
-Recall: {}
-F1 Score: {}"""
+        print()
+        print(metric_string)
 
-for i in range(len(modes)):
-    metric_string = metric_template.format(modes[i], accuracies[i], precisions[i], recalls[i], f1s[i])
+        with open(f"metrics/olmo_{modes[i]}_metrics.txt", "w", encoding="utf-8") as file:
+            file.write(metric_string)
 
-    print()
-    print(metric_string)
+        confusion = confusion_matrix(actual_labels, prediction_index[i], labels=classes)
+        confusion_plot = ConfusionMatrixDisplay(confusion, display_labels=classes)
+        fig, ax = plt.subplots(figsize=(max(6, len(classes)), max(5, len(classes) - 1)))
+        confusion_plot.plot(ax=ax, colorbar=True, cmap="Blues")
+        ax.set_title(f"Confusion Matrix: OLMo with\n{modes[i]} prompting", fontsize=13, pad=12)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+        plt.tight_layout()
+        plt.savefig(f"metrics/olmo_{modes[i]}_confusion_matrix.png", dpi=150)
 
-    with open(f"metrics/olmo_{modes[i]}_metrics.txt", "w", encoding="utf-8") as file:
-        file.write(metric_string)
 
-    confusion = confusion_matrix(actual_labels, prediction_index[i], labels=classes)
-    confusion_plot = ConfusionMatrixDisplay(confusion, display_labels=classes)
-    fig, ax = plt.subplots(figsize=(max(6, len(classes)), max(5, len(classes) - 1)))
-    confusion_plot.plot(ax=ax, colorbar=True, cmap="Blues")
-    ax.set_title(f"Confusion Matrix: OLMo with\n{modes[i]} prompting", fontsize=13, pad=12)
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-    plt.tight_layout()
-    plt.savefig(f"metrics/olmo_{modes[i]}_confusion_matrix.png", dpi=150)
+# Only run the tests if this file was executed as the main program
+if __name__ == "__main__":
+    run_testing()
