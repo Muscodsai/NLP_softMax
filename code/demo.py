@@ -3,14 +3,16 @@ import pretrained_decoder
 from dataset import create_predict_dataset, load_test_examples
 import gradio as gr
 
+baseline_models = ["Naive Bayes", "SVM"]
 decoder_modes = ["0_shot", "few_shot", "chain_of_thought", "few_shot_CoT"]
+test_examples = load_test_examples(0, 2)
 
 
 def demo_baseline() -> gr.Tab:
     """
     Loads baseline model gradio demo in a tab
     """
-    fitted_models, tf_idf_subject_vectoriser, tf_idf_body_vectoriser = baseline.train_baseline()
+    models_cache = {}
 
     with gr.Tab("Baseline Model Demo") as demo:
 
@@ -29,6 +31,17 @@ def demo_baseline() -> gr.Tab:
             """
             if baseline_type is None:
                 return None, None
+            
+            if "models" not in models_cache:
+                fitted_models, tf_idf_subject_vectoriser, tf_idf_body_vectoriser = baseline.train_baseline()
+                models_cache["models"] = (
+                    fitted_models,
+                    tf_idf_subject_vectoriser,
+                    tf_idf_body_vectoriser,
+                )
+            else:
+                fitted_models, tf_idf_subject_vectoriser, tf_idf_body_vectoriser = models_cache["models"]
+
             return baseline.predict_label(
                 create_predict_dataset(subject, body),
                 fitted_models[baseline_type],
@@ -36,22 +49,43 @@ def demo_baseline() -> gr.Tab:
                 tf_idf_body_vectoriser,
             )
 
-        gr.Interface(
-            fn=demo_predict,
-            inputs=[
-                gr.Radio(list(fitted_models.keys()), label="Baseline Model Type"),
-                gr.Textbox(label="Email Subject", lines=2),
-                gr.Textbox(label="Email Body", lines=8),
-            ],
-            outputs=[
-                gr.Text(label="Predicted Label"),
-                gr.DataFrame(column_count=0, label="Class Proba"),
-            ],
-            examples=[
-                [list(fitted_models.keys())[0], example[0], example[1]]
-                for example in load_test_examples(0, 2)
-            ],
+
+        with gr.Row():
+            with gr.Column():
+                baseline_type = gr.Radio(baseline_models, label="Baseline Model Type")
+                subject = gr.Textbox(label="Email Subject", lines=2)
+                body = gr.Textbox(label="Email Body", lines=8)
+
+                btn = gr.Button("Predict", variant="primary")
+
+            with gr.Column():
+                label = gr.Text(label="Predicted Label")
+                proba = gr.DataFrame(column_count=0, label="Class Proba")
+
+        btn.click(
+            demo_predict,
+            inputs=[baseline_type, subject, body],
+            outputs=[label, proba],
         )
+
+        gr.Markdown("---")
+
+        examples=[
+            [model, example[0], example[1]]
+            for model in baseline_models for example in test_examples
+        ]
+
+        for ex in examples:
+            b = gr.Button(f"[{ex[0]} model] {ex[1][:100]}...", variant="secondary")
+
+            def load_example(e=ex):
+                return e
+
+            b.click(
+                load_example,
+                outputs=[baseline_type, subject, body],
+            )
+        
     return demo
 
 
@@ -88,22 +122,43 @@ def demo_olmo() -> gr.Tab:
 
             return label, reasoning
 
-        gr.Interface(
-            fn=demo_predict_olmo,
-            inputs=[
-                gr.Radio(decoder_modes, label="Prompting Method"),
-                gr.Textbox(label="Email Subject", lines=2),
-                gr.Textbox(label="Email Body", lines=8),
-            ],
-            outputs=[
-                gr.Text(label="Predicted Label"),
-                gr.Text(label="Reasoning"),
-            ],
-            examples=[
-                [mode, example[0], example[1]]
-                for mode in decoder_modes for example in load_test_examples(0, 2)
-            ],
+
+        with gr.Row():
+            with gr.Column():
+                modes = gr.Radio(decoder_modes, label="Prompting Method")
+                subject = gr.Textbox(label="Email Subject", lines=2)
+                body = gr.Textbox(label="Email Body", lines=8)
+
+                btn = gr.Button("Predict", variant="primary")
+
+            with gr.Column():
+                label = gr.Text(label="Predicted Label")
+                reasoning = gr.Text(label="Reasoning")
+
+        btn.click(
+            demo_predict_olmo,
+            inputs=[modes, subject, body],
+            outputs=[label, reasoning],
         )
+
+        gr.Markdown("---")
+
+        examples=[
+            [mode, example[0], example[1]]
+            for mode in decoder_modes for example in test_examples
+        ]
+
+        for ex in examples:
+            b = gr.Button(f"[{ex[0]} mode] {ex[1][:100]}...", variant="secondary")
+
+            def load_example(e=ex):
+                return e
+
+            b.click(
+                load_example,
+                outputs=[modes, subject, body],
+            )
+
     return demo
 
 
@@ -112,9 +167,6 @@ def run_demo():
     Runs a gradio demo
     """
     with gr.Blocks() as demo:
-        # TODO: Currently it freezes while trying to change tab for some reason.
-        # However, if you comment out one demo or the other and restart, it
-        # works fine.
         demo_baseline()
 
         demo_olmo()
@@ -122,6 +174,7 @@ def run_demo():
         with gr.Tab("..."):
             pass
 
+    demo.queue()
     demo.launch()
 
 
