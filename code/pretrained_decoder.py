@@ -153,12 +153,12 @@ def run_testing():
     modes = ["0_shot", "few_shot", "chain_of_thought", "few_shot_CoT"]
 
     actual_labels = []
-    pred_0_shot = []
-    pred_few_shot = []
-    pred_CoT = []
-    pred_few_shot_CoT = []
+    preds_0_shot = []
+    preds_few_shot = []
+    preds_CoT = []
+    preds_few_shot_CoT = []
 
-    prediction_index = [pred_0_shot, pred_few_shot, pred_CoT, pred_few_shot_CoT]
+    prediction_index = [preds_0_shot, preds_few_shot, preds_CoT, preds_few_shot_CoT]
 
     num_test_cases = test.shape[0]
 
@@ -181,15 +181,25 @@ def run_testing():
                 break
 
         if not skip:
-            input = create_predict_dataset(row.subject, row.body)
-            actual_labels.append(row.label)
-            pred_0_shot.append(predict_label(input, "0_shot")[0])
-            pred_few_shot.append(predict_label(input, "few_shot")[0])
-            pred_CoT.append(predict_label(input, "chain_of_thought")[0])
-            pred_few_shot_CoT.append(predict_label(input, "few_shot_CoT")[0])
+            try:
+                input = create_predict_dataset(row.subject, row.body)
+                actual_label = row.label
+                pred_0_shot = predict_label(input, "0_shot")[0]
+                pred_few_shot = predict_label(input, "few_shot")[0]
+                pred_CoT = predict_label(input, "chain_of_thought")[0]
+                pred_few_shot_CoT = predict_label(input, "few_shot_CoT")[0]
+            except:
+                # Ignore inputs that result in a gateway timeout, and continue
+                continue
 
             # Timeout to prevent API from being overloaded
             time.sleep(0.1)
+
+        actual_labels.append(actual_label)
+        preds_0_shot.append(pred_0_shot)
+        preds_few_shot.append(pred_few_shot)
+        preds_CoT.append(pred_CoT)
+        preds_few_shot_CoT.append(pred_few_shot_CoT)
 
     # Calculate metrics for each of the 4 prompting modes
     accuracies = []
