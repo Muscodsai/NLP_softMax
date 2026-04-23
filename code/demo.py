@@ -62,7 +62,7 @@ def demo_olmo() -> gr.Tab:
 
     with gr.Tab("Pretrained OLMo Model Demo") as demo:
 
-        def demo_predict(mode: str | None, subject: str, body: str):
+        def demo_predict_olmo(mode: str | None, subject: str, body: str):
             """
             Predict the demo data
 
@@ -89,7 +89,7 @@ def demo_olmo() -> gr.Tab:
             return label, reasoning
 
         gr.Interface(
-            fn=demo_predict,
+            fn=demo_predict_olmo,
             inputs=[
                 gr.Radio(decoder_modes, label="Prompting Method"),
                 gr.Textbox(label="Email Subject", lines=2),
