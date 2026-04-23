@@ -22,6 +22,7 @@ joblib==1.5.3
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
+nltk==3.9.4
 numpy==2.4.4
 orjson==3.11.8
 packaging==26.1
@@ -35,6 +36,7 @@ python-dateutil==2.9.0.post0
 python-multipart==0.0.26
 pytz==2026.1.post1
 PyYAML==6.0.3
+regex==2026.4.4
 rich==15.0.0
 safehttpx==0.1.7
 scikit-learn==1.8.0
