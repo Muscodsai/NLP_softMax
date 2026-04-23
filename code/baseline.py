@@ -4,8 +4,13 @@ from scipy import sparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
-from sklearn.metrics import classification_report
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+)
 import numpy as np
+import matplotlib.pyplot as plt
 
 type BaselineModel = MultinomialNB | SVC
 
@@ -123,7 +128,16 @@ def train_baseline() -> tuple[
         model.fit(train_X_transformed, train_y)
 
         pred_test_y = model.predict(test_X_transformed)
+
         print(classification_report(test_y, pred_test_y))
+
+        print("Confusion Matrix")
+        cm = confusion_matrix(test_y, pred_test_y, labels=model.classes_)
+        disp = ConfusionMatrixDisplay(
+            confusion_matrix=cm, display_labels=model.classes_
+        )
+        disp.plot()
+        plt.show()
 
         trained_baseline_models[model_name] = model
 
