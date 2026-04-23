@@ -1,5 +1,5 @@
 OLMO test metrics for the few_shot_CoT prompting method:
-Accuracy: 0.4
-Precision: 0.26666666666666666
-Recall: 0.26666666666666666
-F1 Score: 0.2
+    Accuracy: 0.6951219512195121
+    Precision: 0.719047619047619
+    Recall: 0.7179220779220781
+    F1 Score: 0.6778846153846153

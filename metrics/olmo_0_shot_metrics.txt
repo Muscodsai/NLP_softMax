@@ -1,5 +1,5 @@
 OLMO test metrics for the 0_shot prompting method:
-Accuracy: 0.0
-Precision: 0.0
-Recall: 0.0
-F1 Score: 0.0
+    Accuracy: 0.5975609756097561
+    Precision: 0.6221784345922277
+    Recall: 0.6119155844155844
+    F1 Score: 0.5856149049658177

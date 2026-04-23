@@ -1,5 +1,5 @@
 OLMO test metrics for the few_shot prompting method:
-Accuracy: 0.4
-Precision: 0.3
-Recall: 0.26666666666666666
-F1 Score: 0.2333333333333333
+    Accuracy: 0.5365853658536586
+    Precision: 0.630528188286809
+    Recall: 0.58262987012987
+    F1 Score: 0.5349203803413907
