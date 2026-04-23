@@ -1,0 +1,5 @@
+OLMO test metrics for the chain_of_thought prompting method:
+Accuracy: 0.4
+Precision: 0.4
+Recall: 0.26666666666666666
+F1 Score: 0.3

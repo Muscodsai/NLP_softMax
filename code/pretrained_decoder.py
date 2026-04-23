@@ -6,6 +6,7 @@ import os
 import dspy
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
+import time
 
 # Import data from dataset (will be needed later for few shot prompting examples)
 train, test = load_dataset()
@@ -167,12 +168,27 @@ print(f"Number of test examples: {num_test_cases}")
 for i, row in enumerate(test.itertuples()):
     print(f"Testing example {i} of {num_test_cases}...")
 
-    input = create_predict_dataset(row.subject, row.body)
-    actual_labels.append(row.label)
-    pred_0_shot.append(predict_label(input, "0_shot")[0])
-    pred_few_shot.append(predict_label(input, "few_shot")[0])
-    pred_CoT.append(predict_label(input, "chain_of_thought")[0])
-    pred_few_shot_CoT.append(predict_label(input, "few_shot_CoT")[0])
+    skip = False
+    body_words = row.body.split()
+
+    # Check if the test example is suitable (OLMo does not like certain inputs
+    # if the token is too long)
+    for word in body_words:
+        if len(word) > 100:
+            print(f"Skipping example {i} of {num_test_cases}: Contains a token which is too long")
+            skip = True
+            break
+
+    if not skip:
+        input = create_predict_dataset(row.subject, row.body)
+        actual_labels.append(row.label)
+        pred_0_shot.append(predict_label(input, "0_shot")[0])
+        pred_few_shot.append(predict_label(input, "few_shot")[0])
+        pred_CoT.append(predict_label(input, "chain_of_thought")[0])
+        pred_few_shot_CoT.append(predict_label(input, "few_shot_CoT")[0])
+
+        # Timeout to prevent API from being overloaded
+        time.sleep(0.1)
 
 # Calculate metrics for each of the 4 prompting modes
 accuracies = []
@@ -184,9 +200,9 @@ print("Computing metrics...")
 
 for i in range(len(modes)):
     accuracies.append(accuracy_score(actual_labels, prediction_index[i]))
-    precisions.append(precision_score(actual_labels, prediction_index[i]), average="macro", labels=classes, zero_division=0)
-    recalls.append(recall_score(actual_labels, prediction_index[i]), average="macro", labels=classes, zero_division=0)
-    f1s.append(f1_score(actual_labels, prediction_index[i]), average="macro", labels=classes, zero_division=0)
+    precisions.append(precision_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
+    recalls.append(recall_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
+    f1s.append(f1_score(actual_labels, prediction_index[i], average="macro", labels=classes, zero_division=0))
 
 # Print and save metrics, and save confusion matrices
 metric_template = """OLMO test metrics for the {} prompting method:
