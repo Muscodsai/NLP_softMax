@@ -4,6 +4,8 @@ from typing import Literal
 from dotenv import load_dotenv
 import os
 import dspy
+import matplotlib.pyplot as plt
+from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 
 # Import data from dataset (will be needed later for few shot prompting examples)
 train, test = load_dataset()
@@ -146,47 +148,57 @@ def predict_label(data: pd.DataFrame, mode: str) -> tuple[str, pd.DataFrame]:
 #         number of requests per month
 # ---------------------------------------------------------------------------
 
-test_subj = "COMP9417-COMP[PHONE]_00122: Week 6 updates"
-test_body="""COMP9417-COMP[PHONE]_00122
-»
-Forums
-»
-Announcements
-»
-Week 6 updates
-Week 6 updates
-by
-Omar Al-Ghattas
-- Monday, 24 March 2025, 3:59 PM
-Hi all,
-Please take note of the following
-1. This week is flex week, so there are no lectures/tutorials.
-2. I will still run help sessions on Wednesday midday and Saturday at 10am on Teams.
-3. The group project spec is now available under the group project heading on moodle.
-Best,
-Omar
-See this post in context
-Change your forum digest preferences"""
+modes = ["0_shot", "few_shot", "chain_of_thought", "few_shot_CoT"]
 
-input = create_predict_dataset(test_subj, test_body)
+actual_labels = []
+pred_0_shot = []
+pred_few_shot = []
+pred_CoT = []
+pred_few_shot_CoT = []
 
-print("0 SHOT:")
-label, ext = predict_label(input, "0_shot")
-print(f"Label: {label}")
-print()
+prediction_index = [pred_0_shot, pred_few_shot, pred_CoT, pred_few_shot_CoT]
 
-print("FEW SHOT:")
-label, ext = predict_label(input, "few_shot")
-print(f"Label: {label}")
-print()
+# Test every email in our test set with each of the 4 prompting modes
+for row in test.itertuples():
+    input = create_predict_dataset(row.subject, row.body)
+    actual_labels.append(row.label)
+    pred_0_shot.append(predict_label(input, "0_shot")[0])
+    pred_few_shot.append(predict_label(input, "few_shot")[0])
+    pred_CoT.append(predict_label(input, "chain_of_thought")[0])
+    pred_few_shot_CoT.append(predict_label(input, "few_shot_CoT")[0])
 
-print("CHAIN OF THOUGHT:")
-label, ext = predict_label(input, "chain_of_thought")
-print(f"Label: {label}")
-print(f"Reasoning: {ext["reasoning"][0]}")
-print()
+# Calculate metrics for each of the 4 prompting modes
+accuracies = []
+precisions = []
+recalls = []
+f1s = []
 
-print("FEW SHOT + CHAIN OF THOUGHT:")
-label, ext = predict_label(input, "few_shot_CoT")
-print(f"Label: {label}")
-print(f"Reasoning: {ext["reasoning"][0]}")
+for i in range(len(modes)):
+    accuracies.append(accuracy_score(actual_labels, prediction_index[i]))
+    precisions.append(precision_score(actual_labels, prediction_index[i]), average="macro", labels=classes, zero_division=0)
+    recalls.append(recall_score(actual_labels, prediction_index[i]), average="macro", labels=classes, zero_division=0)
+    f1s.append(f1_score(actual_labels, prediction_index[i]), average="macro", labels=classes, zero_division=0)
+
+# Print and save metrics, and save confusion matrices
+metric_template = """OLMO test metrics for the {} prompting method:
+Accuracy: {}
+Precision: {}
+Recall: {}
+F1 Score: {}"""
+
+for i in range(len(modes)):
+    metric_string = metric_template.format(modes[i], accuracies[i], precisions[i], recalls[i], f1s[i])
+
+    print()
+    print(metric_string)
+
+    with open(f"metrics/olmo_{modes[i]}_metrics.txt", "w", encoding="utf-8") as file:
+        file.write(metric_string)
+
+    confusion = confusion_matrix(actual_labels, prediction_index[i], labels=classes)
+    confusion_plot = ConfusionMatrixDisplay(confusion, display_labels=classes)
+    fig, ax = plt.subplots(figsize=(max(6, len(classes)), max(5, len(classes) - 1)))
+    confusion_plot.plot(ax=ax, colorbar=True, cmap="Blues")
+    ax.set_title(f"Confusion Matrix: OLMo with {modes[i]} prompting", fontsize=13, pad=12)
+    plt.tight_layout()
+    plt.savefig(f"metrics/olmo_{modes[i]}_confusion_matrix.png", dpi=150)
