@@ -112,7 +112,12 @@ def run_demo():
     Runs a gradio demo
     """
     with gr.Blocks() as demo:
+        # TODO: Currently it freezes while trying to change tab for some reason.
+        # However, if you comment out one demo or the other and restart, it
+        # works fine.
         demo_baseline()
+
+        demo_olmo()
 
         with gr.Tab("..."):
             pass
