@@ -1,9 +1,33 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
+import sys
+import torch
 from datasets import Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import evaluate
+
+
+def patch_torch_compile_for_python_312():
+    if sys.version_info < (3, 12) or not hasattr(torch, "compile"):
+        return
+
+    try:
+        torch.compile(lambda x: x)
+    except RuntimeError as exc:
+        if "Python 3.12+" not in str(exc):
+            raise
+
+        def _noop_compile(model=None, *args, **kwargs):
+            if model is None:
+                return lambda fn: fn
+            return model
+
+        torch.compile = _noop_compile
+
+
+patch_torch_compile_for_python_312()
 
 from transformers import (
     AutoTokenizer,
@@ -13,8 +37,12 @@ from transformers import (
     ModernBertForSequenceClassification,
 )
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+DATA_PATH = ROOT_DIR / "misc" / "school_email_labeled.csv"
+OUTPUT_DIR = ROOT_DIR / "models" / "modernbert_email_cls"
+
 # Load data
-df = pd.read_csv("school_email_labeled.csv").fillna("")
+df = pd.read_csv(DATA_PATH).fillna("")
 df["text"] = "Subject: " + df["subject"] + "\n\nBody: " + df["body"]
 
 # Encode labels
@@ -71,7 +99,7 @@ def compute_metrics(eval_pred):
 
 # Train
 args = TrainingArguments(
-    output_dir="./modernbert_email_cls",
+    output_dir=str(OUTPUT_DIR),
     eval_strategy="epoch",
     save_strategy="epoch",
     logging_steps=20,
@@ -83,7 +111,7 @@ args = TrainingArguments(
     load_best_model_at_end=True,
     metric_for_best_model="macro_f1",
     greater_is_better=True,
-    fp16=True,
+    fp16=torch.cuda.is_available(),
     report_to="none",
 )
 
@@ -100,5 +128,6 @@ trainer.train()
 metrics = trainer.evaluate()
 print(metrics)
 
-trainer.save_model("./modernbert_email_cls")
-tokenizer.save_pretrained("./modernbert_email_cls")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+trainer.save_model(str(OUTPUT_DIR))
+tokenizer.save_pretrained(str(OUTPUT_DIR))

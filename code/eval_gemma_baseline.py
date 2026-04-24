@@ -10,17 +10,17 @@ from tqdm.auto import tqdm
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
-# Load combined data
+# Load available labelled data from the repository.
 train_path = ROOT_DIR / "misc" / "school_email_labeled.csv"
-if not train_path.exists():
-    train_path = Path('/home/qingb/school_email_labeled.csv')
 part2_path = ROOT_DIR / "misc" / "school_email_balanced_300_labeled_part2.csv"
-if not part2_path.exists():
-    part2_path = Path('/home/qingb/school_email_balanced_300_labeled_part2.csv')
 
-train_df = pd.read_csv(train_path).fillna('')
-part2_df = pd.read_csv(part2_path).fillna('')
-all_df = pd.concat([train_df, part2_df], ignore_index=True)
+data_frames = [pd.read_csv(train_path).fillna('')]
+if part2_path.exists():
+    data_frames.append(pd.read_csv(part2_path).fillna(''))
+else:
+    print(f'Optional dataset not found, continuing without it: {part2_path}')
+
+all_df = pd.concat(data_frames, ignore_index=True)
 all_df['text'] = 'Subject: ' + all_df['subject'] + '\n\nBody: ' + all_df['body']
 
 le = LabelEncoder()

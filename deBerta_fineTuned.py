@@ -53,7 +53,7 @@ class FormatDataset(Dataset):
     def __init__(self, df):
         df = preprocess_input(df)
 
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=False)
         encodings = tokenize_dataframe(df, tokenizer)   
         labels = LabelEncoder().fit_transform(df["label"])
 
@@ -90,7 +90,8 @@ test_dataset  = FormatDataset(test_df)
 num_labels = len(train_df["label"].unique())
 model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_NAME,
-    num_labels=num_labels
+    num_labels=num_labels,
+    use_safetensors=True,
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -149,11 +150,11 @@ for epoch in range(epochs):
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
-        model.save_pretrained("best_model")
+        model.save_pretrained("best_model", safe_serialization=True)
         print("checkpoint saved")
 
 
-model = AutoModelForSequenceClassification.from_pretrained("best_model")
+model = AutoModelForSequenceClassification.from_pretrained("best_model", use_safetensors=True)
 model.to(device)
 model.eval()
 

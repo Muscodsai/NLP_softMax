@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import pandas as pd
+from pathlib import Path
+import sys
 from datasets import Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -12,8 +14,34 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
 
+def patch_torch_compile_for_python_312():
+    if sys.version_info < (3, 12) or not hasattr(torch, "compile"):
+        return
+
+    try:
+        torch.compile(lambda x: x)
+    except RuntimeError as exc:
+        if "Python 3.12+" not in str(exc):
+            raise
+
+        def _noop_compile(model=None, *args, **kwargs):
+            if model is None:
+                return lambda fn: fn
+            return model
+
+        torch.compile = _noop_compile
+
+
+patch_torch_compile_for_python_312()
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+DATA_PATH = ROOT_DIR / "misc" / "school_email_labeled.csv"
+MODEL_DIR = ROOT_DIR / "models" / "modern_BERT"
+CONFUSION_MATRIX_PATH = ROOT_DIR / "models" / "bert_confusion_matrix_600.png"
+
+
 def load_test_data():
-    all_df = pd.read_csv("code/misc/school_email_labeled.csv").fillna("")
+    all_df = pd.read_csv(DATA_PATH).fillna("")
     all_df["text"] = "Subject: " + all_df["subject"] + "\n\nBody: " + all_df["body"]
 
     le = LabelEncoder()
@@ -54,6 +82,7 @@ def evaluate_model(model_path, label_encoder, test_ds, test_df, title, output_pa
         num_labels=len(labels),
         id2label=id2label,
         label2id=label2id,
+        use_safetensors=True,
     )
     model.eval()
 
@@ -96,7 +125,7 @@ if __name__ == "__main__":
     test_ds, test_df, le = load_test_data()
     print(f"Test set size: {len(test_df)}")
 
-    model_dir = "../models/modern_BERT"
+    model_dir = str(MODEL_DIR)
     assert os.path.isdir(model_dir), f"Model directory not found: {model_dir}"
 
     evaluate_model(
@@ -104,6 +133,6 @@ if __name__ == "__main__":
         le,
         test_ds,
         test_df,
-        "ModernBERT Fine-tuned (600 samples) Test Confusion Matrix",
-        "../models/bert_confusion_matrix_600.png",
+        "ModernBERT Fine-tuned Test Confusion Matrix",
+        str(CONFUSION_MATRIX_PATH),
     )

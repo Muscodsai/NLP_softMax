@@ -1,9 +1,40 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
+import sys
+import torch
 from datasets import Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import evaluate
+
+
+def patch_torch_compile_for_python_312():
+    """
+    ModernBERT decorates some modules with torch.compile at import time.
+    On Python 3.12, older torch releases expose torch.compile but raise
+    at call time because Dynamo support is unavailable. Replace it with a
+    no-op decorator so the model can still be imported and trained.
+    """
+    if sys.version_info < (3, 12) or not hasattr(torch, "compile"):
+        return
+
+    try:
+        torch.compile(lambda x: x)
+    except RuntimeError as exc:
+        if "Python 3.12+" not in str(exc):
+            raise
+
+        def _noop_compile(model=None, *args, **kwargs):
+            if model is None:
+                return lambda fn: fn
+            return model
+
+        torch.compile = _noop_compile
+
+
+patch_torch_compile_for_python_312()
+
 from transformers import (
     AutoTokenizer,
     DataCollatorWithPadding,
@@ -12,9 +43,13 @@ from transformers import (
     ModernBertForSequenceClassification,
 )
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+DATA_PATH = ROOT_DIR / "misc" / "school_email_labeled.csv"
+MODEL_OUTPUT_DIR = ROOT_DIR / "models" / "modern_BERT"
+
 
 def load_data():
-    all_df = pd.read_csv("code/misc/school_email_labeled.csv").fillna("")
+    all_df = pd.read_csv(DATA_PATH).fillna("")
     all_df["text"] = "Subject: " + all_df["subject"] + "\n\nBody: " + all_df["body"]
 
     le = LabelEncoder()
@@ -91,10 +126,10 @@ if __name__ == "__main__":
             "macro_f1": f1.compute(predictions=preds, references=labels, average="macro")["f1"],
         }
 
-    output_dir = "../models/modern_BERT"
+    MODEL_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     args = TrainingArguments(
-        output_dir=output_dir,
+        output_dir=str(MODEL_OUTPUT_DIR),
         eval_strategy="epoch",
         save_strategy="epoch",
         logging_steps=20,
@@ -106,7 +141,7 @@ if __name__ == "__main__":
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
-        fp16=True,
+        fp16=torch.cuda.is_available(),
         report_to="none",
     )
 
@@ -124,6 +159,6 @@ if __name__ == "__main__":
     print("Validation metrics:")
     print(trainer.evaluate(eval_dataset=val_ds))
 
-    print("Saving fine-tuned model to", output_dir)
-    trainer.save_model(output_dir)
-    tokenizer.save_pretrained(output_dir)
+    print("Saving fine-tuned model to", MODEL_OUTPUT_DIR)
+    trainer.save_model(str(MODEL_OUTPUT_DIR))
+    tokenizer.save_pretrained(str(MODEL_OUTPUT_DIR))
