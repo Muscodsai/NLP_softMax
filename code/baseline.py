@@ -137,6 +137,7 @@ def train_baseline() -> tuple[
             confusion_matrix=cm, display_labels=model.classes_
         )
         disp.plot()
+        plt.xticks(rotation=90)
         plt.show()
 
         trained_baseline_models[model_name] = model
