@@ -41,6 +41,83 @@ huggingface-cli login
 
 All commands below are intended to be run from the repository root.
 
+## Unified Comparison
+The easiest way to compare models fairly is to score them on one shared test split instead of letting each script create its own split.
+
+This repo now includes a unified benchmark script:
+
+```bash
+python code/benchmark_all_models.py
+```
+
+It uses one canonical stratified split of `misc/school_email_labeled.csv`:
+- 60% train
+- 20% validation
+- 20% test
+
+It reports one comparison table for:
+- Naive Bayes baseline
+- SVM baseline
+- local ModernBERT checkpoint in `models/modern_BERT/`
+- local DeBERTa checkpoint in `best_model/`
+- optional Gemma benchmark
+
+The table is also saved to `metrics/model_comparison.csv`.
+
+If you want to include Gemma in the shared benchmark:
+
+```bash
+python code/benchmark_all_models.py --include-gemma
+```
+
+Important:
+- This gives every evaluated model the same test set.
+- For a fully fair final comparison, retrain each trainable model using the same canonical train/validation split before comparing the benchmark results.
+- If a local model checkpoint is missing, the script marks that model as skipped instead of failing the whole run.
+
+### Canonical benchmark workflow
+Compare trainable transformer models, use the new canonical entrypoints.
+
+1. Train ModernBERT on the canonical split
+```bash
+python code/train_modernbert_canonical.py
+```
+
+This saves the model to `models/modern_BERT_canonical/`.
+
+2. Train DeBERTa on the canonical split
+```bash
+python code/train_deberta_canonical.py
+```
+
+This saves the best checkpoint to `models/deberta_canonical/best_model/`.
+
+3. Run the canonical benchmark
+```bash
+python code/benchmark_all_models_canonical.py
+```
+
+This benchmark compares:
+- Naive Bayes baseline
+- SVM baseline
+- `models/modern_BERT_canonical/`
+- `models/deberta_canonical/best_model/`
+
+Outputs:
+- overall comparison table: `metrics/model_comparison_canonical.csv`
+- per-class comparison table: `metrics/model_comparison_canonical_per_class.csv`
+
+To also include Gemma in the same benchmark:
+
+```bash
+python code/benchmark_all_models_canonical.py --include-gemma
+```
+
+Notes:
+- If a checkpoint is missing, that model is reported as skipped in the benchmark output.
+- Gemma requires Hugging Face access approval and local authentication.
+- The per-class output includes `precision`, `recall`, `f1`, and `support` for every label and model.
+
 ## External Access
 - `answerdotai/ModernBERT-base`: public on Hugging Face, no token required for normal download.
 - `microsoft/deberta-v3-base`: public on Hugging Face, no token required for normal download.
