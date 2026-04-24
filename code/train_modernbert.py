@@ -10,12 +10,7 @@ import evaluate
 
 
 def patch_torch_compile_for_python_312():
-    """
-    ModernBERT decorates some modules with torch.compile at import time.
-    On Python 3.12, older torch releases expose torch.compile but raise
-    at call time because Dynamo support is unavailable. Replace it with a
-    no-op decorator so the model can still be imported and trained.
-    """
+    # patch torch.compile to avoid incompatibility between 3.12 and mordernbert's dependencies
     if sys.version_info < (3, 12) or not hasattr(torch, "compile"):
         return
 
@@ -49,15 +44,18 @@ MODEL_OUTPUT_DIR = ROOT_DIR / "models" / "modern_BERT"
 
 
 def load_data():
+    # keep the same random state and stratification to ensure the same split between training and evaluation
     all_df = pd.read_csv(DATA_PATH).fillna("")
     all_df["text"] = "Subject: " + all_df["subject"] + "\n\nBody: " + all_df["body"]
 
+    # encode labels and create mappings
     le = LabelEncoder()
     all_df["label_id"] = le.fit_transform(all_df["label"])
 
     id2label = {i: name for i, name in enumerate(le.classes_)}
     label2id = {name: i for i, name in id2label.items()}
 
+    # create splits with same random state
     train_val_df, test_df = train_test_split(
         all_df,
         test_size=0.2,
@@ -104,6 +102,7 @@ if __name__ == "__main__":
     )
 
     def tokenize_fn(batch):
+        # tokenize the batch of examples use the same tokenizer and settings to ensure consistency
         return tokenizer(
             batch["text"],
             truncation=True,
@@ -113,6 +112,7 @@ if __name__ == "__main__":
     train_ds = train_ds.map(tokenize_fn, batched=True)
     val_ds = val_ds.map(tokenize_fn, batched=True)
 
+    # use the same collator to ensure consistent padding
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     accuracy = evaluate.load("accuracy")
@@ -126,6 +126,7 @@ if __name__ == "__main__":
             "macro_f1": f1.compute(predictions=preds, references=labels, average="macro")["f1"],
         }
 
+    # save checkpoints under the repository models directory
     MODEL_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     args = TrainingArguments(

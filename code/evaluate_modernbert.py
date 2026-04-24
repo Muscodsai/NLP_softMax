@@ -15,6 +15,7 @@ import torch
 
 
 def patch_torch_compile_for_python_312():
+    # patch torch.compile to avoid incompatibility between 3.12 and mordernbert's dependencies
     if sys.version_info < (3, 12) or not hasattr(torch, "compile"):
         return
 
@@ -34,6 +35,7 @@ def patch_torch_compile_for_python_312():
 
 patch_torch_compile_for_python_312()
 
+# define paths relative to the repository root for portability
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT_DIR / "misc" / "school_email_labeled.csv"
 MODEL_DIR = ROOT_DIR / "models" / "modern_BERT"
@@ -41,6 +43,7 @@ CONFUSION_MATRIX_PATH = ROOT_DIR / "models" / "bert_confusion_matrix_600.png"
 
 
 def load_test_data():
+    # create the same held-out split used during training
     all_df = pd.read_csv(DATA_PATH).fillna("")
     all_df["text"] = "Subject: " + all_df["subject"] + "\n\nBody: " + all_df["body"]
 
@@ -72,6 +75,7 @@ def tokenize_fn(batch, tokenizer):
 
 
 def evaluate_model(model_path, label_encoder, test_ds, test_df, title, output_path):
+    # prepare model and tokenizer
     labels = list(label_encoder.classes_)
     id2label = {i: name for i, name in enumerate(labels)}
     label2id = {name: i for i, name in id2label.items()}
@@ -86,9 +90,11 @@ def evaluate_model(model_path, label_encoder, test_ds, test_df, title, output_pa
     )
     model.eval()
 
+    # tokenize once before the per-example inference loop
     test_ds_tokenized = test_ds.map(lambda batch: tokenize_fn(batch, tokenizer), batched=True)
 
     predictions = []
+    # run inference
     for example in test_ds_tokenized:
         inputs = tokenizer(example["text"], return_tensors="pt", truncation=True, padding=True, max_length=1024)
         with torch.no_grad():
@@ -96,6 +102,7 @@ def evaluate_model(model_path, label_encoder, test_ds, test_df, title, output_pa
         preds = np.argmax(outputs.logits.numpy(), axis=-1)
         predictions.extend(preds.tolist())
 
+    # compute metrics
     true_labels = test_df["label_id"].tolist()
     accuracy = evaluate.load("accuracy")
     f1 = evaluate.load("f1")
@@ -108,6 +115,7 @@ def evaluate_model(model_path, label_encoder, test_ds, test_df, title, output_pa
     print(f"\n{title} metrics:")
     print(metrics)
 
+    # plot confusion matrix
     cm = confusion_matrix(true_labels, predictions)
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt="d", xticklabels=labels, yticklabels=labels, cmap="Blues")

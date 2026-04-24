@@ -53,6 +53,7 @@ class FormatDataset(Dataset):
     def __init__(self, df):
         df = preprocess_input(df)
 
+        # use the slow tokenizer path to avoid fast-tokenizer conversion issues
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=False)
         encodings = tokenize_dataframe(df, tokenizer)   
         labels = LabelEncoder().fit_transform(df["label"])
@@ -91,6 +92,7 @@ num_labels = len(train_df["label"].unique())
 model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_NAME,
     num_labels=num_labels,
+    # Prefer safetensors so loading does not rely on the restricted torch.load path.
     use_safetensors=True,
 )
 
@@ -150,6 +152,7 @@ for epoch in range(epochs):
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
+        # Save a safetensors checkpoint so reload uses the same safe path.
         model.save_pretrained("best_model", safe_serialization=True)
         print("checkpoint saved")
 
