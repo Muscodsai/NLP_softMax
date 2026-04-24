@@ -34,10 +34,10 @@ def patch_torch_compile_for_python_312():
 patch_torch_compile_for_python_312()
 
 LABEL_COLUMNS = ["accuracy", "macro_precision", "macro_recall", "macro_f1", "evaluated_samples"]
-MODERNBERT_DIR = ROOT_DIR / "models" / "modern_BERT"
-DEBERTA_DIR = ROOT_DIR / "best_model"
-OUTPUT_PATH = ROOT_DIR / "metrics" / "model_comparison.csv"
-PER_CLASS_OUTPUT_PATH = ROOT_DIR / "metrics" / "model_comparison_per_class.csv"
+DEFAULT_MODERNBERT_DIR = ROOT_DIR / "models" / "modern_BERT_canonical"
+DEFAULT_DEBERTA_DIR = ROOT_DIR / "models" / "deberta_canonical" / "best_model"
+DEFAULT_OUTPUT_PATH = ROOT_DIR / "metrics" / "model_comparison.csv"
+DEFAULT_PER_CLASS_OUTPUT_PATH = ROOT_DIR / "metrics" / "model_comparison_per_class.csv"
 GEMMA_MODEL_ID = "google/gemma-7b-it"
 
 
@@ -265,6 +265,30 @@ def main():
         description="Compare repository models on one canonical test split."
     )
     parser.add_argument(
+        "--modernbert-dir",
+        type=Path,
+        default=DEFAULT_MODERNBERT_DIR,
+        help="Directory containing the ModernBERT checkpoint to benchmark.",
+    )
+    parser.add_argument(
+        "--deberta-dir",
+        type=Path,
+        default=DEFAULT_DEBERTA_DIR,
+        help="Directory containing the DeBERTa checkpoint to benchmark.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT_PATH,
+        help="CSV path for the overall comparison table.",
+    )
+    parser.add_argument(
+        "--per-class-output",
+        type=Path,
+        default=DEFAULT_PER_CLASS_OUTPUT_PATH,
+        help="CSV path for the per-class comparison table.",
+    )
+    parser.add_argument(
         "--include-gemma",
         action="store_true",
         help="Run the gated Gemma benchmark as part of the comparison.",
@@ -283,7 +307,7 @@ def main():
 
     modernbert_row, modernbert_per_class_rows = evaluate_encoder_model(
         "ModernBERT",
-        MODERNBERT_DIR,
+        args.modernbert_dir,
         test_df,
         max_length=1024,
         label_names=labels,
@@ -293,7 +317,7 @@ def main():
 
     deberta_row, deberta_per_class_rows = evaluate_encoder_model(
         "DeBERTa v3",
-        DEBERTA_DIR,
+        args.deberta_dir,
         test_df,
         max_length=256,
         label_names=labels,
@@ -317,9 +341,9 @@ def main():
         na_position="last",
     ).reset_index(drop=True)
 
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    results.to_csv(OUTPUT_PATH, index=False)
-    per_class_results.to_csv(PER_CLASS_OUTPUT_PATH, index=False)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    results.to_csv(args.output, index=False)
+    per_class_results.to_csv(args.per_class_output, index=False)
 
     print("Canonical split:")
     print(f"  train={len(train_df)} val={len(val_df)} test={len(test_df)}")
@@ -329,9 +353,9 @@ def main():
     print("Per-class performance:")
     print(per_class_results.to_string(index=False))
     print()
-    print(f"Saved comparison table to {OUTPUT_PATH}")
-    print(f"Saved per-class comparison table to {PER_CLASS_OUTPUT_PATH}")
-    print("Fair comparison note: retrain trainable models on this canonical split before using the table for final ranking.")
+    print(f"Saved comparison table to {args.output}")
+    print(f"Saved per-class comparison table to {args.per_class_output}")
+    print("Canonical benchmark note: use checkpoints trained on this shared split for final ranking.")
 
 
 if __name__ == "__main__":

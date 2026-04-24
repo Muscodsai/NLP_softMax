@@ -41,6 +41,7 @@ from transformers import (
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT_DIR / "misc" / "school_email_labeled.csv"
 MODEL_OUTPUT_DIR = ROOT_DIR / "models" / "modern_BERT"
+MODEL_ID = "answerdotai/ModernBERT-base"
 
 
 def get_precision_args():
@@ -92,18 +93,22 @@ def load_data():
     return train_ds, val_ds, test_ds, le, id2label, label2id
 
 
-if __name__ == "__main__":
-    train_ds, val_ds, test_ds, le, id2label, label2id = load_data()
+def train_modernbert(
+    train_ds,
+    val_ds,
+    *,
+    label_names,
+    output_dir,
+    model_id=MODEL_ID,
+    run_label="fine-tuned",
+):
+    id2label = {i: name for i, name in enumerate(label_names)}
+    label2id = {name: i for i, name in id2label.items()}
 
-    print(f"Training samples: {len(train_ds)}")
-    print(f"Validation samples: {len(val_ds)}")
-    print(f"Test samples: {len(test_ds)}")
-
-    model_id = "answerdotai/ModernBERT-base"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = ModernBertForSequenceClassification.from_pretrained(
         model_id,
-        num_labels=len(le.classes_),
+        num_labels=len(label_names),
         id2label=id2label,
         label2id=label2id,
         attn_implementation="eager",
@@ -111,7 +116,6 @@ if __name__ == "__main__":
     )
 
     def tokenize_fn(batch):
-        # tokenize the batch of examples use the same tokenizer and settings to ensure consistency
         return tokenizer(
             batch["text"],
             truncation=True,
@@ -120,8 +124,6 @@ if __name__ == "__main__":
 
     train_ds = train_ds.map(tokenize_fn, batched=True)
     val_ds = val_ds.map(tokenize_fn, batched=True)
-
-    # use the same collator to ensure consistent padding
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     accuracy = evaluate.load("accuracy")
@@ -135,12 +137,10 @@ if __name__ == "__main__":
             "macro_f1": f1.compute(predictions=preds, references=labels, average="macro")["f1"],
         }
 
-    # save checkpoints under the repository models directory
-    MODEL_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     precision_args = get_precision_args()
-
     args = TrainingArguments(
-        output_dir=str(MODEL_OUTPUT_DIR),
+        output_dir=str(output_dir),
         eval_strategy="epoch",
         save_strategy="epoch",
         logging_steps=20,
@@ -166,10 +166,27 @@ if __name__ == "__main__":
     )
 
     trainer.train()
-
     print("Validation metrics:")
     print(trainer.evaluate(eval_dataset=val_ds))
 
-    print("Saving fine-tuned model to", MODEL_OUTPUT_DIR)
-    trainer.save_model(str(MODEL_OUTPUT_DIR))
-    tokenizer.save_pretrained(str(MODEL_OUTPUT_DIR))
+    print(f"Saving {run_label} model to", output_dir)
+    trainer.save_model(str(output_dir))
+    tokenizer.save_pretrained(str(output_dir))
+
+    return trainer
+
+
+if __name__ == "__main__":
+    train_ds, val_ds, test_ds, le, id2label, label2id = load_data()
+
+    print(f"Training samples: {len(train_ds)}")
+    print(f"Validation samples: {len(val_ds)}")
+    print(f"Test samples: {len(test_ds)}")
+
+    train_modernbert(
+        train_ds,
+        val_ds,
+        label_names=list(le.classes_),
+        output_dir=MODEL_OUTPUT_DIR,
+        run_label="fine-tuned",
+    )
