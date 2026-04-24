@@ -1,0 +1,6 @@
+model,accuracy,macro_precision,macro_recall,macro_f1,evaluated_samples,status,notes
+SVM,0.875,0.8846560846560847,0.875,0.8766496582266294,120.0,ok,
+Naive Bayes,0.875,0.889092389092389,0.875,0.87573023055376,120.0,ok,
+DeBERTa Canonical,0.8583333333333333,0.8777543859649122,0.8583333333333334,0.8607860254420536,120.0,ok,
+ModernBERT Canonical,0.85,0.8716666666666667,0.85,0.8543266763747314,120.0,ok,
+Gemma 7B,,,,,,skipped,Pass --include-gemma to run the gated 7B benchmark.

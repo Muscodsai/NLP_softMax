@@ -43,6 +43,13 @@ DATA_PATH = ROOT_DIR / "misc" / "school_email_labeled.csv"
 MODEL_OUTPUT_DIR = ROOT_DIR / "models" / "modern_BERT"
 
 
+def get_precision_args():
+    # bf16=True only if the GPU explicitly supports BF16
+    if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+        return {"bf16": True, "fp16": False}
+    return {"bf16": False, "fp16": False}
+
+
 def load_data():
     # keep the same random state and stratification to ensure the same split between training and evaluation
     all_df = pd.read_csv(DATA_PATH).fillna("")
@@ -99,6 +106,8 @@ if __name__ == "__main__":
         num_labels=len(le.classes_),
         id2label=id2label,
         label2id=label2id,
+        attn_implementation="eager",
+        torch_dtype=torch.float32,
     )
 
     def tokenize_fn(batch):
@@ -128,6 +137,7 @@ if __name__ == "__main__":
 
     # save checkpoints under the repository models directory
     MODEL_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    precision_args = get_precision_args()
 
     args = TrainingArguments(
         output_dir=str(MODEL_OUTPUT_DIR),
@@ -142,7 +152,7 @@ if __name__ == "__main__":
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
-        fp16=torch.cuda.is_available(),
+        **precision_args,
         report_to="none",
     )
 

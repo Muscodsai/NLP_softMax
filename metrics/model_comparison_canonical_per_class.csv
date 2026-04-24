@@ -1,0 +1,26 @@
+model,label,precision,recall,f1,support,status,notes
+DeBERTa Canonical,coursework,0.6666666666666666,0.9166666666666666,0.7719298245614035,24.0,ok,
+DeBERTa Canonical,discussion_forums,1.0,0.9166666666666666,0.9565217391304348,24.0,ok,
+DeBERTa Canonical,opportunities_events,0.88,0.9166666666666666,0.8979591836734694,24.0,ok,
+DeBERTa Canonical,project_development,1.0,0.875,0.9333333333333333,24.0,ok,
+DeBERTa Canonical,university_admin,0.8421052631578947,0.6666666666666666,0.7441860465116279,24.0,ok,
+ModernBERT Canonical,coursework,0.6666666666666666,0.9166666666666666,0.7719298245614035,24.0,ok,
+ModernBERT Canonical,discussion_forums,1.0,0.9166666666666666,0.9565217391304348,24.0,ok,
+ModernBERT Canonical,opportunities_events,0.9,0.75,0.8181818181818182,24.0,ok,
+ModernBERT Canonical,project_development,1.0,0.875,0.9333333333333333,24.0,ok,
+ModernBERT Canonical,university_admin,0.7916666666666666,0.7916666666666666,0.7916666666666666,24.0,ok,
+Naive Bayes,coursework,0.7037037037037037,0.7916666666666666,0.7450980392156863,24.0,ok,
+Naive Bayes,discussion_forums,0.8846153846153846,0.9583333333333334,0.92,24.0,ok,
+Naive Bayes,opportunities_events,0.8571428571428571,1.0,0.9230769230769231,24.0,ok,
+Naive Bayes,project_development,1.0,0.875,0.9333333333333333,24.0,ok,
+Naive Bayes,university_admin,1.0,0.75,0.8571428571428571,24.0,ok,
+SVM,coursework,0.7142857142857143,0.8333333333333334,0.7692307692307693,24.0,ok,
+SVM,discussion_forums,1.0,0.9583333333333334,0.9787234042553191,24.0,ok,
+SVM,opportunities_events,0.8518518518518519,0.9583333333333334,0.9019607843137255,24.0,ok,
+SVM,project_development,1.0,0.875,0.9333333333333333,24.0,ok,
+SVM,university_admin,0.8571428571428571,0.75,0.8,24.0,ok,
+Gemma 7B,coursework,,,,,skipped,Pass --include-gemma to run the gated 7B benchmark.
+Gemma 7B,discussion_forums,,,,,skipped,Pass --include-gemma to run the gated 7B benchmark.
+Gemma 7B,opportunities_events,,,,,skipped,Pass --include-gemma to run the gated 7B benchmark.
+Gemma 7B,project_development,,,,,skipped,Pass --include-gemma to run the gated 7B benchmark.
+Gemma 7B,university_admin,,,,,skipped,Pass --include-gemma to run the gated 7B benchmark.

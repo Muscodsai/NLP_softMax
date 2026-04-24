@@ -86,6 +86,8 @@ def evaluate_model(model_path, label_encoder, test_ds, test_df, title, output_pa
         num_labels=len(labels),
         id2label=id2label,
         label2id=label2id,
+        attn_implementation="eager",
+        torch_dtype=torch.float32,
         use_safetensors=True,
     )
     model.eval()
