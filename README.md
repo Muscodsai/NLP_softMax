@@ -58,11 +58,32 @@ huggingface-cli login
 python code/demo.py
 ```
 
-This launches the Gradio demo for the baseline models and the pretrained OLMo prompting pipeline.
+This launches a Gradio app with these tabs:
+- Baseline Model Demo
+- ModernBERT Demo
+- Pretrained OLMo Model Demo
+- Gemma Demo
 
 Notes:
 - The demo needs an available local port for Gradio. In this environment, the default range `7860-7959` was already occupied.
 - The OLMo demo path also depends on `DECODER_API_KEY`.
+- The ModernBERT demo needs a trained local model under `models/modern_BERT/`.
+- The Gemma demo needs Hugging Face access approval and local authentication for `google/gemma-7b-it`.
+
+To launch the demo locally:
+
+```bash
+source venv/bin/activate
+python code/demo.py
+```
+
+If Gradio reports that the default ports are busy, launch it on a specific port:
+
+```bash
+GRADIO_SERVER_PORT=7861 python code/demo.py
+```
+
+Then open the local URL printed by Gradio in your browser.
 
 ## Classical baselines
 Train and evaluate the TF-IDF + Naive Bayes / SVM baselines:
