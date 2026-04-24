@@ -102,9 +102,11 @@ def train_modernbert(
     model_id=MODEL_ID,
     run_label="fine-tuned",
 ):
+    # create label mappings for model config
     id2label = {i: name for i, name in enumerate(label_names)}
     label2id = {name: i for i, name in id2label.items()}
 
+    # load pretrained model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = ModernBertForSequenceClassification.from_pretrained(
         model_id,
@@ -122,13 +124,16 @@ def train_modernbert(
             max_length=1024,
         )
 
+    # tokenize datasets
     train_ds = train_ds.map(tokenize_fn, batched=True)
     val_ds = val_ds.map(tokenize_fn, batched=True)
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
+    # load evaluation metrics
     accuracy = evaluate.load("accuracy")
     f1 = evaluate.load("f1")
 
+    # compute accuracy and macro F1
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
         preds = np.argmax(logits, axis=-1)

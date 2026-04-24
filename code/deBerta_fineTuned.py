@@ -13,6 +13,7 @@ METRICS_PATH = ROOT_DIR / "test_metrics.json"
 CONFUSION_MATRIX_PATH = ROOT_DIR / "confusion_matrix.png"
 
 def load_dataset_with_validation_set() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    # The two-stage split keeps label proportions roughly stable across train/val/test.
     data = pd.read_csv(ROOT_DIR / "misc" / "school_email_labeled.csv").fillna("")
     train_val, test_data = train_test_split(
         data,
@@ -37,6 +38,7 @@ def preprocess_input(df: pd.DataFrame) -> pd.DataFrame:
         df["body"] = ""
     df["subject"] = df["subject"].fillna("").astype(str)
     df["body"] = df["body"].fillna("").astype(str)
+    # DeBERTa was trained with explicit subject/body markers instead of the ModernBERT template.
     df["text"] = (
         "[SUBJECT] " +
         df["subject"] +
@@ -56,6 +58,7 @@ def tokenize_dataframe(df, tokenizer, max_length=256):
 
 class FormatDataset(Dataset):
     def __init__(self, df, tokenizer=None, label_to_id=None, max_length=256):
+        # Pre-tokenize once so the training loop can work with simple tensor batches.
         df = preprocess_input(df)
 
         if tokenizer is None:
@@ -95,6 +98,7 @@ import torch
 import json
 
 def evaluate_model(model, data_loader, device):
+    # Shared evaluation helper used for validation during training and final test scoring.
     model.eval()
     all_preds = []
     all_labels = []
@@ -130,9 +134,11 @@ def train_and_evaluate_deberta(
     test_metrics_title="Final Test Metrics:",
     confusion_matrix_title="Confusion Matrix — Test Set",
 ):
+    # Keep label ordering fixed so saved checkpoints and metric reports use the same ids.
     labels = sorted(train_df["label"].unique())
     label_to_id = {label: idx for idx, label in enumerate(labels)}
 
+    # All three splits use the same tokenizer and label mapping.
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=False)
     train_dataset = FormatDataset(train_df, tokenizer=tokenizer, label_to_id=label_to_id)
     val_dataset = FormatDataset(val_df, tokenizer=tokenizer, label_to_id=label_to_id)
@@ -152,6 +158,7 @@ def train_and_evaluate_deberta(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
+    # Train/val/test loaders are built separately because only train should shuffle.
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=16)
     test_loader = DataLoader(test_dataset, batch_size=16)
@@ -170,6 +177,7 @@ def train_and_evaluate_deberta(
     output_dir.mkdir(parents=True, exist_ok=True)
     best_model_dir.mkdir(parents=True, exist_ok=True)
 
+    # Train for a few epochs and keep the checkpoint with the best validation accuracy.
     for epoch in range(epochs):
         model.train()
         total_loss = 0.0
@@ -201,6 +209,7 @@ def train_and_evaluate_deberta(
             tokenizer.save_pretrained(best_model_dir)
             print("checkpoint saved")
 
+    # Final reported metrics always come from reloading the best saved checkpoint.
     model = AutoModelForSequenceClassification.from_pretrained(best_model_dir, use_safetensors=True)
     model.to(device)
     _, _, all_labels, all_preds = evaluate_model(model, test_loader, device)
@@ -219,6 +228,7 @@ def train_and_evaluate_deberta(
     print(f"Recall : {recall:.4f}  ({avg})")
     print(f"F1 : {f1:.4f}  ({avg})")
 
+    # Save both a numeric summary and a confusion matrix artifact for later comparison.
     cm = confusion_matrix(all_labels, all_preds)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     fig, ax = plt.subplots(figsize=(max(6, num_labels), max(5, num_labels - 1)))

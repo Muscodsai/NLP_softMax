@@ -53,6 +53,7 @@ LABEL2ID = {label: idx for idx, label in enumerate(LABELS)}
 
 
 def resolve_modernbert_path() -> Path:
+    # Prefer the exported model directory, but fall back to the latest checkpoint if needed.
     if (MODERNBERT_DIR / "config.json").is_file():
         return MODERNBERT_DIR
 
@@ -92,6 +93,7 @@ def demo_baseline() -> gr.Tab:
             if baseline_type is None:
                 return None, None
             
+            # Train the classical baselines only once per app session, then reuse them.
             if "models" not in models_cache:
                 fitted_models, tf_idf_subject_vectoriser, tf_idf_body_vectoriser = baseline.train_baseline()
                 models_cache["models"] = (
@@ -158,6 +160,7 @@ def demo_modernbert() -> gr.Tab:
     with gr.Tab("ModernBERT Demo") as demo:
 
         def demo_predict_modernbert(subject: str, body: str):
+            # Lazily load the local checkpoint so the app can start before model weights are needed.
             if "model" not in model_cache:
                 model_path = resolve_modernbert_path()
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -170,6 +173,7 @@ def demo_modernbert() -> gr.Tab:
             else:
                 tokenizer, model = model_cache["model"]
 
+            # Use the same input text template as ModernBERT training and evaluation.
             text = build_input_text(subject, body)
             inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=1024)
             with torch.no_grad():
@@ -242,6 +246,7 @@ def demo_olmo() -> gr.Tab:
             if mode is None:
                 return None, None
             
+            # The DSPy pipeline is already initialized in pretrained_decoder, so the demo just forwards inputs.
             decoder_input = create_predict_dataset(subject, body)
             label, ext = pretrained_decoder.predict_label(decoder_input, mode)
 
@@ -308,6 +313,7 @@ def demo_gemma() -> gr.Tab:
             )
 
         def demo_predict_gemma(subject: str, body: str):
+            # Gemma is loaded on first use because it is the heaviest demo dependency.
             if "model" not in model_cache:
                 tokenizer = AutoTokenizer.from_pretrained(GEMMA_MODEL_ID)
                 if tokenizer.pad_token is None:
@@ -323,6 +329,7 @@ def demo_gemma() -> gr.Tab:
             else:
                 tokenizer, model = model_cache["model"]
 
+            # This prompt mirrors the benchmark path for the raw Gemma classifier.
             prompt = build_prompt(subject, body)
             inputs = tokenizer(prompt, return_tensors="pt")
             if torch.cuda.is_available():

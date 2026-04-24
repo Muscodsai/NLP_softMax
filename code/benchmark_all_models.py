@@ -41,7 +41,18 @@ DEFAULT_PER_CLASS_OUTPUT_PATH = ROOT_DIR / "metrics" / "model_comparison_per_cla
 GEMMA_MODEL_ID = "google/gemma-7b-it"
 
 
+def build_modernbert_text(row: pd.Series) -> str:
+    # match the text template used during ModernBERT training
+    return f"Subject: {row['subject']}\n\nBody: {row['body']}"
+
+
+def build_deberta_text(row: pd.Series) -> str:
+    # match the text template used during DeBERTa training
+    return f"[SUBJECT] {row['subject']} [BODY] {row['body']}"
+
+
 def metric_row(model_name: str, y_true, y_pred, label_names: list[str]) -> tuple[dict[str, object], list[dict[str, object]]]:
+    # write both one overall row and one row per label so the CSVs stay aligned
     overall_row = {
         "model": model_name,
         "accuracy": accuracy_score(y_true, y_pred),
@@ -74,7 +85,7 @@ def metric_row(model_name: str, y_true, y_pred, label_names: list[str]) -> tuple
         )
     return overall_row, per_class_rows
 
-
+# skip evaluation and write empty rows if a model is missing or fails to load
 def skipped_row(
     model_name: str,
     reason: str,
@@ -166,6 +177,7 @@ def evaluate_encoder_model(
     *,
     max_length: int,
     label_names: list[str],
+    text_builder,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     if not model_dir.is_dir():
         return skipped_row(model_name, f"Missing local model directory: {model_dir}", label_names)
@@ -180,7 +192,9 @@ def evaluate_encoder_model(
     model.eval()
 
     predictions = []
-    for text in test_df["text"].tolist():
+    # rebuild each sample in the same format the model saw during training
+    for _, row in test_df.iterrows():
+        text = text_builder(row)
         inputs = tokenizer(
             text,
             return_tensors="pt",
@@ -214,6 +228,7 @@ def evaluate_gemma(
         return skipped_row("Gemma 7B", "Pass --include-gemma to run the gated 7B benchmark.", labels)
 
     try:
+        # Gemma is optional because it needs remote access, authentication, and more memory
         tokenizer = AutoTokenizer.from_pretrained(GEMMA_MODEL_ID)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -231,6 +246,7 @@ def evaluate_gemma(
     predictions = []
     valid_indices = []
 
+    # only keep samples where the generated text clearly names one benchmark label
     for idx, text in enumerate(test_df["text"].tolist()):
         prompt = build_gemma_prompt(text, labels)
         inputs = tokenizer(prompt, return_tensors="pt")
@@ -252,6 +268,7 @@ def evaluate_gemma(
     if not predictions:
         return skipped_row("Gemma 7B", "No valid label strings were generated on the benchmark split.", labels)
 
+    # Gemma may score on fewer than the full test samples, so note that in the output rows.
     y_true = test_df.iloc[valid_indices]["label_id"].tolist()
     row, per_class_rows = metric_row("Gemma 7B", y_true, predictions, labels)
     row["notes"] = f"Evaluated {len(predictions)} of {len(test_df)} samples with parsable outputs."
@@ -301,16 +318,19 @@ def main():
     rows = []
     per_class_rows = []
 
+    # baselines are retrained directly on the canonical split before scoring.
     baseline_rows, baseline_per_class_rows = evaluate_baselines(train_df, test_df, labels)
     rows.extend(baseline_rows)
     per_class_rows.extend(baseline_per_class_rows)
 
+    # local encoder checkpoints are scored on the same canonical test split.
     modernbert_row, modernbert_per_class_rows = evaluate_encoder_model(
         "ModernBERT",
         args.modernbert_dir,
         test_df,
         max_length=1024,
         label_names=labels,
+        text_builder=build_modernbert_text,
     )
     rows.append(modernbert_row)
     per_class_rows.extend(modernbert_per_class_rows)
@@ -321,10 +341,12 @@ def main():
         test_df,
         max_length=256,
         label_names=labels,
+        text_builder=build_deberta_text,
     )
     rows.append(deberta_row)
     per_class_rows.extend(deberta_per_class_rows)
 
+    # Gemma remains optional because it is not a fully local checkpoint.
     gemma_row, gemma_per_class_rows = evaluate_gemma(test_df, labels, include_gemma=args.include_gemma)
     rows.append(gemma_row)
     per_class_rows.extend(gemma_per_class_rows)
