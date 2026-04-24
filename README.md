@@ -44,39 +44,15 @@ All commands below are intended to be run from the repository root.
 ## Unified Comparison
 The easiest way to compare models fairly is to score them on one shared test split instead of letting each script create its own split.
 
-This repo now includes a unified benchmark script:
-
-```bash
-python code/benchmark_all_models.py
-```
+For the benchmark in this repo, the intended workflow is:
+- train ModernBERT on the canonical split
+- train DeBERTa on the same canonical split
+- compare both checkpoints, plus the classical baselines, on the shared test set
 
 It uses one canonical stratified split of `misc/school_email_labeled.csv`:
 - 60% train
 - 20% validation
 - 20% test
-
-It reports one comparison table for:
-- Naive Bayes baseline
-- SVM baseline
-- local ModernBERT checkpoint in `models/modern_BERT/`
-- local DeBERTa checkpoint in `best_model/`
-- optional Gemma benchmark
-
-The table is also saved to `metrics/model_comparison.csv`.
-
-If you want to include Gemma in the shared benchmark:
-
-```bash
-python code/benchmark_all_models.py --include-gemma
-```
-
-Important:
-- This gives every evaluated model the same test set.
-- For a fully fair final comparison, retrain each trainable model using the same canonical train/validation split before comparing the benchmark results.
-- If a local model checkpoint is missing, the script marks that model as skipped instead of failing the whole run.
-
-### Canonical benchmark workflow
-Compare trainable transformer models, use the new canonical entrypoints.
 
 1. Train ModernBERT on the canonical split
 ```bash
@@ -92,9 +68,9 @@ python code/train_deberta_canonical.py
 
 This saves the best checkpoint to `models/deberta_canonical/best_model/`.
 
-3. Run the canonical benchmark
+3. Run the benchmark
 ```bash
-python code/benchmark_all_models_canonical.py
+python code/benchmark_all_models.py
 ```
 
 This benchmark compares:
@@ -104,19 +80,21 @@ This benchmark compares:
 - `models/deberta_canonical/best_model/`
 
 Outputs:
-- overall comparison table: `metrics/model_comparison_canonical.csv`
-- per-class comparison table: `metrics/model_comparison_canonical_per_class.csv`
+- overall comparison table: `metrics/model_comparison.csv`
+- per-class comparison table: `metrics/model_comparison_per_class.csv`
 
 To also include Gemma in the same benchmark:
 
 ```bash
-python code/benchmark_all_models_canonical.py --include-gemma
+python code/benchmark_all_models.py --include-gemma
 ```
 
 Notes:
-- If a checkpoint is missing, that model is reported as skipped in the benchmark output.
+- The full benchmark expects both canonical checkpoints above to exist before you run it.
+- If a checkpoint is missing, that model is reported as skipped in the benchmark output instead of being included in the final comparison.
 - Gemma requires Hugging Face access approval and local authentication.
 - The per-class output includes `precision`, `recall`, `f1`, and `support` for every label and model.
+- If you need to benchmark different checkpoint directories, `code/benchmark_all_models.py` also accepts `--modernbert-dir` and `--deberta-dir`.
 
 ## External Access
 - `answerdotai/ModernBERT-base`: public on Hugging Face, no token required for normal download.
@@ -201,7 +179,7 @@ Prerequisites:
 Train and evaluate the DeBERTa model:
 
 ```bash
-python deBerta_fineTuned.py
+python code/deBerta_fineTuned.py
 ```
 
 This script trains `microsoft/deberta-v3-base`, saves the best checkpoint to `best_model/`, writes a confusion matrix to `confusion_matrix.png`, and saves summary metrics to `test_metrics.json`.
@@ -241,5 +219,5 @@ Prerequisites:
 ## Notes
 - The transformer-based scripts download model weights from Hugging Face on first run, so internet access and sufficient disk space are required unless the models are already cached.
 - `code/pretrained_decoder.py` additionally requires valid API access through `DECODER_API_KEY`.
-- In the current environment, `code/train_modernbert.py` and `deBerta_fineTuned.py` were verified to start correctly under Python 3.12 after dependency and compatibility fixes.
+- In the current environment, `code/train_modernbert.py` and `code/deBerta_fineTuned.py` were verified to start correctly under Python 3.12 after dependency and compatibility fixes.
 - `code/evaluate_modernbert.py` still depends on a completed ModernBERT training run because it expects `models/modern_BERT/` to exist.
