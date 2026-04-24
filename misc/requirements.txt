@@ -55,6 +55,16 @@ threadpoolctl==3.6.0
 tomlkit==0.14.0
 tqdm==4.67.3
 typer==0.24.1
+torch==2.1.0
+transformers==4.40.0
+accelerate==1.19.0
+sentencepiece==0.1.99
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.44.0
+matplotlib==3.9.4
+seaborn==0.13.2
+datasets==2.19.0
+evaluate==0.4.1
+python-dotenv==1.0.0
+dspy-ai==2.4.1
