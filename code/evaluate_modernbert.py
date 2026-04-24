@@ -13,7 +13,7 @@ import torch
 
 
 def load_test_data():
-    all_df = pd.read_csv("../misc/school_email_labeled.csv").fillna("")
+    all_df = pd.read_csv("code/misc/school_email_labeled.csv").fillna("")
     all_df["text"] = "Subject: " + all_df["subject"] + "\n\nBody: " + all_df["body"]
 
     le = LabelEncoder()
